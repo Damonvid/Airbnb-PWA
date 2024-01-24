@@ -1,50 +1,7 @@
-<script>
-const app = document.getElementById('app');
-const frequencyInput = document.getElementById('frequency');
-const startButton = document.getElementById('start');
-const volumeControl = document.getElementById('volume');
+<!DOCTYPE html>
+<html>
+<body>
 
-let context = new (window.AudioContext || window.webkitAudioContext)();
-let oscillator = null;
-let gainNode = null;
-
-function startTone() {
- oscillator = context.createOscillator();
- gainNode = context.createGain();
-
- oscillator.type = 'sine'; // Set oscillator type to sine wave
- oscillator.connect(gainNode);
- gainNode.connect(context.destination);
-
- oscillator.frequency.value = parseFloat(frequencyInput.value);
- gainNode.gain.value = parseFloat(volumeControl.value);
-
- oscillator.start();
-}
-
-function stopTone() {
- if (oscillator && oscillator.stop) {
-    oscillator.stop();
- }
-}
-
-startButton.addEventListener('click', () => {
- stopTone();
- startTone();
-});
-
-frequencyInput.addEventListener('change', () => {
- if (oscillator) {
-    oscillator.frequency.value = parseFloat(frequencyInput.value);
- }
-});
-
-volumeControl.addEventListener('input', () => {
- if (gainNode) {
-    gainNode.gain.value = parseFloat(volumeControl.value);
- }
-});
-</script>
 
 
 <div id="app">
@@ -104,3 +61,8 @@ volumeControl.addEventListener('input', () => {
  }
 });
 </script>
+
+
+
+</body>
+</html>
