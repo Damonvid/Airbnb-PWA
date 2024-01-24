@@ -23,6 +23,7 @@ const volumeControl = document.getElementById('volume');
 let context = new (window.AudioContext || window.webkitAudioContext)();
 let oscillator = null;
 let gainNode = null;
+let playing = false;
 
 function startTone() {
  oscillator = context.createOscillator();
@@ -45,8 +46,18 @@ function stopTone() {
 }
 
 startButton.addEventListener('click', () => {
- stopTone();
- startTone();
+ if(playing)
+ {
+ 	stopTone();
+    playing = false;
+    startButton.innerHTML = "Play";
+ }
+ else
+ {
+ 	startTone();
+    playing = true;
+ 	startButton.innerHTML = "Stop";
+ }
 });
 
 frequencyInput.addEventListener('change', () => {
