@@ -1,85 +1,147 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pure Tone Audiometry</title>
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background-color: #f7f7f7;
+            color: #333;
+        }
+        .container {
+            max-width: 1000px;
+            margin: auto;
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+            font-weight: 300;
+            font-size: 2.5em;
+            margin-bottom: 40px;
+        }
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 4px;
+        }
+        th, td {
+            padding: 0;
+        }
+        th {
+            font-weight: 400;
+            color: #888;
+            padding: 10px 0;
+        }
+        button {
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            background-color: #e0e0e0;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 0.8em;
+            color: #888;
+        }
+        button:hover {
+            background-color: #d0d0d0;
+        }
+        button.active {
+            background-color: #ff6b6b;
+            color: white;
+        }
+        #result {
+            margin-top: 30px;
+            padding: 20px;
+            background-color: #f1f3f5;
+            border-radius: 8px;
+            font-weight: 300;
+            text-align: center;
+        }
+    </style>
+</head>
 <body>
+    <div class="container">
+        <h1>Audiometry</h1>
+        <table id="audiogramTable"></table>
+        <div id="result"></div>
+    </div>
 
+    <script>
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const frequencies = [250, 500, 1000, 2000, 4000, 6000, 8000];
+        const decibels = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90];
+        let lastSelectedTones = {};
 
+        const result = document.getElementById('result');
+        const table = document.getElementById('audiogramTable');
 
-<div id="app">
- <label for="frequency">Frequency:</label>
- <input type="number" id="frequency" min="0" max="20000" value="440">
-  
- <button id="start">Start</button>
-  
- <label for="volume">Volume:</label>
- <input type="range" id="volume" min="0" max="1" step="0.001" value="1">
- <label id="volume_val"></label>
-</div>
+        function createTable() {
+            let html = '<tr><th></th>';
+            frequencies.forEach(freq => {
+                html += `<th>${freq}</th>`;
+            });
+            html += '</tr>';
 
-<script>
-const app = document.getElementById('app');
-const frequencyControl = document.getElementById('frequncy_slider');
-const frequencyInput = document.getElementById('frequency');
-const startButton = document.getElementById('start');
-const volumeControl = document.getElementById('volume');
-const volumeValue = document.getElementById('volume_val');
+            decibels.slice().reverse().forEach(db => {
+                html += `<tr><th>${db}</th>`;
+                frequencies.forEach(freq => {
+                    html += `<td><button onclick="selectAndPlayTone(${freq}, ${db})" id="btn-${freq}-${db}"></button></td>`;
+                });
+                html += '</tr>';
+            });
 
-let context = new (window.AudioContext || window.webkitAudioContext)();
-let oscillator = null;
-let gainNode = null;
-let playing = false;
+            table.innerHTML = html;
+        }
 
-volumeValue.innerHTML = parseFloat(volumeControl.value);
+        function selectAndPlayTone(frequency, decibel) {
+            lastSelectedTones[frequency] = decibel;
 
-function startTone() {
- oscillator = context.createOscillator();
- gainNode = context.createGain();
+            decibels.forEach(db => {
+                const btn = document.getElementById(`btn-${frequency}-${db}`);
+                if (db === decibel) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
 
- oscillator.type = 'sine'; // Set oscillator type to sine wave
- oscillator.connect(gainNode);
- gainNode.connect(context.destination);
+            playTone(frequency, decibel);
+        }
 
- oscillator.frequency.value = parseFloat(frequencyInput.value);
- gainNode.gain.value = parseFloat(volumeControl.value);
+        function playTone(frequency, decibel) {
+            if (audioContext.state === 'suspended') {
+                audioContext.resume();
+            }
 
- oscillator.start();
-}
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
 
-function stopTone() {
- if (oscillator && oscillator.stop) {
-    oscillator.stop();
- }
-}
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
 
-startButton.addEventListener('click', () => {
- if(playing)
- {
- 	stopTone();
-    playing = false;
-    startButton.innerHTML = "Play";
- }
- else
- {
- 	startTone();
-    playing = true;
- 	startButton.innerHTML = "Stop";
- }
-});
+            const gainValue = Math.pow(10, (decibel - 90) / 20);
+            gainNode.gain.setValueAtTime(gainValue, audioContext.currentTime);
 
-frequencyInput.addEventListener('change', () => {
- if (oscillator) {
-    oscillator.frequency.value = parseFloat(frequencyInput.value);
- }
-});
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
 
-volumeControl.addEventListener('input', () => {
- if (gainNode) {
-    gainNode.gain.value = parseFloat(volumeControl.value);
- }
- volumeValue.innerHTML = parseFloat(volumeControl.value);
-});
-</script>
+            oscillator.start();
+            oscillator.stop(audioContext.currentTime + 1);
 
+            result.textContent = `${frequency} Hz at ${decibel} dB`;
+        }
 
-
+        createTable();
+    </script>
 </body>
 </html>
