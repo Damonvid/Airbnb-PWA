@@ -32,18 +32,37 @@
             width: 100%;
             border-collapse: separate;
             border-spacing: 4px;
+            table-layout: fixed;
         }
         th, td {
             padding: 0;
+            text-align: center;
         }
         th {
             font-weight: 400;
             color: #888;
             padding: 10px 0;
+            font-size: 0.8em;
+        }
+        td {
+            height: 50px;
+        }
+        .corner-header {
+            width: 60px;
+            text-align: center;
+            font-weight: bold;
+        }
+        .freq-header {
+            width: 60px;
+        }
+        .db-header {
+            width: 40px;
+            text-align: right;
+            padding-right: 10px;
         }
         button {
-            width: 100%;
-            aspect-ratio: 1 / 1;
+            width: 70px;
+            height: 70px;
             background-color: #e0e0e0;
             border: none;
             border-radius: 50%;
@@ -51,6 +70,9 @@
             transition: all 0.3s ease;
             font-size: 0.8em;
             color: #888;
+            padding: 0;
+            margin: 0 auto;
+            display: block;
         }
         button:hover {
             background-color: #d0d0d0;
@@ -70,8 +92,11 @@
     </style>
 </head>
 <body>
+    <div class="container">
+        <h1>Audiometry</h1>
         <table id="audiogramTable"></table>
         <div id="result"></div>
+    </div>
 
     <script>
         const audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -83,14 +108,14 @@
         const table = document.getElementById('audiogramTable');
 
         function createTable() {
-            let html = '<tr><th></th>';
+            let html = '<tr><th class="corner-header">dB / Hz</th>';
             frequencies.forEach(freq => {
-                html += `<th>${freq}</th>`;
+                html += `<th class="freq-header">${freq}</th>`;
             });
             html += '</tr>';
 
-            decibels.slice().reverse().forEach(db => {
-                html += `<tr><th>${db}</th>`;
+            decibels.forEach(db => {
+                html += `<tr><th class="db-header">${db}</th>`;
                 frequencies.forEach(freq => {
                     html += `<td><button onclick="selectAndPlayTone(${freq}, ${db})" id="btn-${freq}-${db}"></button></td>`;
                 });
