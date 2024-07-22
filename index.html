@@ -4,6 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pure Tone Audiometry</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#f7f7f7">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.1/chart.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
         body {
             font-family: 'Helvetica Neue', Arial, sans-serif;
@@ -21,30 +25,39 @@
             border-radius: 12px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         }
-        h1 {
+        h1, h2 {
             text-align: center;
             color: #333;
             font-weight: 300;
-            font-size: 2em;
-            margin-bottom: 20px;
         }
-        .controls {
+        h1 { font-size: 2em; margin-bottom: 20px; }
+        h2 { font-size: 1.5em; margin-top: 30px; }
+        .controls, .export-controls {
             display: flex;
             justify-content: center;
+            gap: 10px;
             margin-bottom: 20px;
         }
-        #earToggle {
+        .ear-button, .export-button {
             padding: 10px 20px;
             font-size: 1em;
             cursor: pointer;
-            background-color: #4CAF50;
-            color: white;
+            background-color: #e0e0e0;
+            color: #333;
             border: none;
             border-radius: 5px;
             transition: background-color 0.3s;
         }
-        #earToggle:hover {
-            background-color: #45a049;
+        .ear-button:hover, .export-button:hover {
+            background-color: #d0d0d0;
+        }
+        .ear-button.active-left {
+            background-color: #ff6b6b;
+            color: white;
+        }
+        .ear-button.active-right {
+            background-color: #4CAF50;
+            color: white;
         }
         .table-container {
             overflow-x: auto;
@@ -94,8 +107,12 @@
         button.tone-button:hover {
             background-color: #d0d0d0;
         }
-        button.tone-button.active {
+        button.tone-button.active-left {
             background-color: #ff6b6b;
+            color: white;
+        }
+        button.tone-button.active-right {
+            background-color: #4CAF50;
             color: white;
         }
         #result {
@@ -106,13 +123,15 @@
             font-weight: 300;
             text-align: center;
         }
+        #chartContainer {
+            width: 100%;
+            max-width: 800px;
+            margin: 30px auto;
+        }
         @media (max-width: 768px) {
-            .container {
-                padding: 10px;
-            }
-            h1 {
-                font-size: 1.5em;
-            }
+            .container { padding: 10px; }
+            h1 { font-size: 1.5em; }
+            h2 { font-size: 1.2em; }
             button.tone-button {
                 width: 25px;
                 height: 25px;
@@ -121,17 +140,26 @@
     </style>
 </head>
 <body>
-
         <div class="controls">
-            <button id="earToggle">Left Ear</button>
+            <button id="leftEarButton" class="ear-button active-left">Left Ear</button>
+            <button id="rightEarButton" class="ear-button">Right Ear</button>
         </div>
         <div class="table-container">
             <table id="audiogramTable"></table>
         </div>
         <div id="result"></div>
+        <h2>Audiometry Plot</h2>
+        <div id="chartContainer">
+            <canvas id="audiogramChart"></canvas>
+        </div>
+        <div class="export-controls">
+            <button id="exportJSON" class="export-button">Export JSON</button>
+            <button id="exportPNG" class="export-button">Export PNG</button>
+        </div>
+    
 
     <script>
-        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+         const audioContext = new (window.AudioContext || window.webkitAudioContext)();
         const frequencies = [250, 500, 1000, 2000, 4000, 6000, 8000];
         const decibels = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90];
         let lastSelectedTones = { left: {}, right: {} };
@@ -139,7 +167,12 @@
 
         const result = document.getElementById('result');
         const table = document.getElementById('audiogramTable');
-        const earToggle = document.getElementById('earToggle');
+        const leftEarButton = document.getElementById('leftEarButton');
+        const rightEarButton = document.getElementById('rightEarButton');
+        const exportJSONButton = document.getElementById('exportJSON');
+        const exportPNGButton = document.getElementById('exportPNG');
+
+        let audiogramChart;
 
         function createTable() {
             let html = '<tr><th class="corner-header">dB / Hz</th>';
@@ -162,15 +195,8 @@
         function selectAndPlayTone(frequency, decibel) {
             lastSelectedTones[currentEar][frequency] = decibel;
 
-            decibels.forEach(db => {
-                const btn = document.getElementById(`btn-${frequency}-${db}`);
-                if (db === decibel) {
-                    btn.classList.add('active');
-                } else {
-                    btn.classList.remove('active');
-                }
-            });
-
+            updateButtonStates();
+            updateChart();
             playTone(frequency, decibel);
         }
 
@@ -201,27 +227,173 @@
             result.textContent = `${currentEar.charAt(0).toUpperCase() + currentEar.slice(1)} Ear: ${frequency} Hz at ${decibel} dB`;
         }
 
-        function toggleEar() {
-            currentEar = currentEar === 'left' ? 'right' : 'left';
-            earToggle.textContent = `${currentEar.charAt(0).toUpperCase() + currentEar.slice(1)} Ear`;
+        function setEar(ear) {
+            currentEar = ear;
+            updateEarButtons();
             updateButtonStates();
+            updateChart();
+        }
+
+        function updateEarButtons() {
+            leftEarButton.classList.toggle('active-left', currentEar === 'left');
+            rightEarButton.classList.toggle('active-right', currentEar === 'right');
         }
 
         function updateButtonStates() {
             frequencies.forEach(freq => {
                 decibels.forEach(db => {
                     const btn = document.getElementById(`btn-${freq}-${db}`);
+                    btn.classList.remove('active-left', 'active-right');
                     if (lastSelectedTones[currentEar][freq] === db) {
-                        btn.classList.add('active');
-                    } else {
-                        btn.classList.remove('active');
+                        btn.classList.add(`active-${currentEar}`);
                     }
                 });
             });
         }
 
+        function createChart() {
+            const ctx = document.getElementById('audiogramChart').getContext('2d');
+            audiogramChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: frequencies,
+                    datasets: [
+                        {
+                            label: 'Left Ear',
+                            data: [],
+                            borderColor: '#ff6b6b',
+                            backgroundColor: 'rgba(255, 107, 107, 0.1)',
+                            pointBackgroundColor: '#ff6b6b',
+                            pointRadius: 6,
+                            pointHoverRadius: 8,
+                        },
+                        {
+                            label: 'Right Ear',
+                            data: [],
+                            borderColor: '#4CAF50',
+                            backgroundColor: 'rgba(76, 175, 80, 0.1)',
+                            pointBackgroundColor: '#4CAF50',
+                            pointRadius: 6,
+                            pointHoverRadius: 8,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        x: {
+                            type: 'logarithmic',
+                            title: {
+                                display: true,
+                                text: 'Frequency (Hz)'
+                            }
+                        },
+                        y: {
+                            reverse: true,
+                            title: {
+                                display: true,
+                                text: 'Hearing Level (dB HL)'
+                            },
+                            min: -10,
+                            max: 120
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        },
+                        title: {
+                            display: true,
+                            text: 'Pure Tone Audiogram'
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateChart() {
+            audiogramChart.data.datasets[0].data = frequencies.map(freq => lastSelectedTones.left[freq] || null);
+            audiogramChart.data.datasets[1].data = frequencies.map(freq => lastSelectedTones.right[freq] || null);
+            audiogramChart.update();
+        }
         createTable();
-        earToggle.addEventListener('click', toggleEar);
+        createChart();
+        leftEarButton.addEventListener('click', () => setEar('left'));
+        rightEarButton.addEventListener('click', () => setEar('right'));
+        exportJSONButton.addEventListener('click', exportJSON);
+        exportPNGButton.addEventListener('click', exportPNG);
+
+        function exportJSON() {
+            const data = JSON.stringify(lastSelectedTones, null, 2);
+            const blob = new Blob([data], {type: 'application/json'});
+            
+            if ('showSaveFilePicker' in window) {
+                const opts = {
+                    types: [{
+                        description: 'JSON File',
+                        accept: {'application/json': ['.json']},
+                    }],
+                    suggestedName: 'audiogram_data.json',
+                };
+                window.showSaveFilePicker(opts).then((handle) => {
+                    handle.createWritable().then((writable) => {
+                        writable.write(blob).then(() => writable.close());
+                    });
+                });
+            } else {
+                // Fallback for browsers that don't support the File System Access API
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'audiogram_data.json';
+                a.click();
+                URL.revokeObjectURL(url);
+            }
+        }
+
+        function exportPNG() {
+            html2canvas(document.getElementById('chartContainer')).then(canvas => {
+                canvas.toBlob(blob => {
+                    if ('showSaveFilePicker' in window) {
+                        const opts = {
+                            types: [{
+                                description: 'PNG Image',
+                                accept: {'image/png': ['.png']},
+                            }],
+                            suggestedName: 'audiogram_chart.png',
+                        };
+                        window.showSaveFilePicker(opts).then((handle) => {
+                            handle.createWritable().then((writable) => {
+                                writable.write(blob).then(() => writable.close());
+                            });
+                        });
+                    } else {
+                        // Fallback for browsers that don't support the File System Access API
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = 'audiogram_chart.png';
+                        a.click();
+                        URL.revokeObjectURL(url);
+                    }
+                });
+            });
+        }
+
+        // PWA-related code
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/service-worker.js')
+                    .then(registration => {
+                        console.log('Service Worker registered:', registration);
+                    })
+                    .catch(error => {
+                        console.log('Service Worker registration failed:', error);
+                    });
+            });
+        }
+
+        // ... (rest of the previous JavaScript code) ...
     </script>
 </body>
 </html>
