@@ -82,6 +82,19 @@
             text-align: center;
             font-weight: bold;
         }
+        .corner-label {
+            position: absolute;
+            font-weight: bold;
+            font-size: 0.8em;
+        }
+        .corner-label-db {
+            bottom: 5px;
+            left: 5px;
+        }
+        .corner-label-hz {
+            top: 5px;
+            right: 5px;
+        }
         .freq-header {
             min-width: 60px;
         }
@@ -173,7 +186,7 @@
         let audiogramChart;
 
         function createTable() {
-            let html = '<tr><th class="corner-header">dB / Hz</th>';
+            let html = '<tr><th class="corner-header"><span class="corner-label corner-label-db">dB</span><span class="corner-label corner-label-hz">Hz</span></th>';
             frequencies.forEach(freq => {
                 html += `<th class="freq-header">${freq}</th>`;
             });
