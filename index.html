@@ -17,7 +17,7 @@
             max-width: 1000px;
             margin: auto;
             background: white;
-            padding: 40px;
+            padding: 20px;
             border-radius: 12px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         }
@@ -25,44 +25,61 @@
             text-align: center;
             color: #333;
             font-weight: 300;
-            font-size: 2.5em;
-            margin-bottom: 40px;
+            font-size: 2em;
+            margin-bottom: 20px;
+        }
+        .controls {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+        #earToggle {
+            padding: 10px 20px;
+            font-size: 1em;
+            cursor: pointer;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            transition: background-color 0.3s;
+        }
+        #earToggle:hover {
+            background-color: #45a049;
+        }
+        .table-container {
+            overflow-x: auto;
         }
         table {
             width: 100%;
             border-collapse: separate;
-            border-spacing: 4px;
+            border-spacing: 2px;
             table-layout: fixed;
         }
         th, td {
-            padding: 0;
+            padding: 5px;
             text-align: center;
         }
         th {
             font-weight: 400;
             color: #888;
-            padding: 10px 0;
             font-size: 0.8em;
         }
-        td {
-            height: 50px;
-        }
         .corner-header {
-            width: 60px;
+            min-width: 60px;
             text-align: center;
             font-weight: bold;
         }
         .freq-header {
-            width: 60px;
+            min-width: 60px;
         }
         .db-header {
-            width: 40px;
+            min-width: 40px;
             text-align: right;
             padding-right: 10px;
         }
-        button {
-            width: 70%;
-            height: 70%;
+        button.tone-button {
+            width: 30px;
+            height: 30px;
             background-color: #e0e0e0;
             border: none;
             border-radius: 50%;
@@ -74,36 +91,55 @@
             margin: 0 auto;
             display: block;
         }
-        button:hover {
+        button.tone-button:hover {
             background-color: #d0d0d0;
         }
-        button.active {
+        button.tone-button.active {
             background-color: #ff6b6b;
             color: white;
         }
         #result {
-            margin-top: 30px;
-            padding: 20px;
+            margin-top: 20px;
+            padding: 10px;
             background-color: #f1f3f5;
             border-radius: 8px;
             font-weight: 300;
             text-align: center;
         }
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            h1 {
+                font-size: 1.5em;
+            }
+            button.tone-button {
+                width: 25px;
+                height: 25px;
+            }
+        }
     </style>
 </head>
 <body>
-    
-    <table id="audiogramTable"></table>
-    <div id="result"></div>
-    
+
+        <div class="controls">
+            <button id="earToggle">Left Ear</button>
+        </div>
+        <div class="table-container">
+            <table id="audiogramTable"></table>
+        </div>
+        <div id="result"></div>
+
     <script>
         const audioContext = new (window.AudioContext || window.webkitAudioContext)();
         const frequencies = [250, 500, 1000, 2000, 4000, 6000, 8000];
         const decibels = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90];
-        let lastSelectedTones = {};
+        let lastSelectedTones = { left: {}, right: {} };
+        let currentEar = 'left';
 
         const result = document.getElementById('result');
         const table = document.getElementById('audiogramTable');
+        const earToggle = document.getElementById('earToggle');
 
         function createTable() {
             let html = '<tr><th class="corner-header">dB / Hz</th>';
@@ -115,7 +151,7 @@
             decibels.forEach(db => {
                 html += `<tr><th class="db-header">${db}</th>`;
                 frequencies.forEach(freq => {
-                    html += `<td><button onclick="selectAndPlayTone(${freq}, ${db})" id="btn-${freq}-${db}"></button></td>`;
+                    html += `<td><button class="tone-button" onclick="selectAndPlayTone(${freq}, ${db})" id="btn-${freq}-${db}"></button></td>`;
                 });
                 html += '</tr>';
             });
@@ -124,7 +160,7 @@
         }
 
         function selectAndPlayTone(frequency, decibel) {
-            lastSelectedTones[frequency] = decibel;
+            lastSelectedTones[currentEar][frequency] = decibel;
 
             decibels.forEach(db => {
                 const btn = document.getElementById(`btn-${frequency}-${db}`);
@@ -145,6 +181,7 @@
 
             const oscillator = audioContext.createOscillator();
             const gainNode = audioContext.createGain();
+            const panNode = audioContext.createStereoPanner();
 
             oscillator.type = 'sine';
             oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
@@ -152,16 +189,39 @@
             const gainValue = Math.pow(10, (decibel - 90) / 20);
             gainNode.gain.setValueAtTime(gainValue, audioContext.currentTime);
 
+            panNode.pan.setValueAtTime(currentEar === 'left' ? -1 : 1, audioContext.currentTime);
+
             oscillator.connect(gainNode);
-            gainNode.connect(audioContext.destination);
+            gainNode.connect(panNode);
+            panNode.connect(audioContext.destination);
 
             oscillator.start();
             oscillator.stop(audioContext.currentTime + 1);
 
-            result.textContent = `${frequency} Hz at ${decibel} dB`;
+            result.textContent = `${currentEar.charAt(0).toUpperCase() + currentEar.slice(1)} Ear: ${frequency} Hz at ${decibel} dB`;
+        }
+
+        function toggleEar() {
+            currentEar = currentEar === 'left' ? 'right' : 'left';
+            earToggle.textContent = `${currentEar.charAt(0).toUpperCase() + currentEar.slice(1)} Ear`;
+            updateButtonStates();
+        }
+
+        function updateButtonStates() {
+            frequencies.forEach(freq => {
+                decibels.forEach(db => {
+                    const btn = document.getElementById(`btn-${freq}-${db}`);
+                    if (lastSelectedTones[currentEar][freq] === db) {
+                        btn.classList.add('active');
+                    } else {
+                        btn.classList.remove('active');
+                    }
+                });
+            });
         }
 
         createTable();
+        earToggle.addEventListener('click', toggleEar);
     </script>
 </body>
 </html>
