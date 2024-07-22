@@ -1,5 +1,5 @@
- var GHPATH = '/Airbnb-pwa';
-  var APP_PREFIX = 'Abnbpwa_';
+ var GHPATH = '/PTA';
+  var APP_PREFIX = 'PTA_';
   var VERSION = 'version_00';
   var URLS = [   
     `${GHPATH}/`,
